@@ -1,0 +1,12 @@
+Flask
+Flask-Cache
+gunicorn
+futures
+requests
+urllib3
+rdflib==4.2.0
+python-dateutil
+pyld
+rdflib-jsonld
+jsonpath-rw
+shortuuid

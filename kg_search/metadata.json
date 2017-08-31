@@ -1,0 +1,7 @@
+{
+  "version": "0.1.0",
+  "author": "Fernando Serena",
+  "email": "fserena@fi.upm.es",
+  "github": "https://github.com/fserena/kg-search",
+  "description": "A REST API wrapper for Google Knowledge Graph"
+}

@@ -1,0 +1,7 @@
+.env/
+.idea/
+*.pyc
+*.egg-info
+dist/
+build/
+wiki-entities
