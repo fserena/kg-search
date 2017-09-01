@@ -50,11 +50,13 @@ def search():
             gen = search_seeds_from_image(img, types=types)
         else:
             gen = search_seeds(q, types=types, count=limit)
-        for types, q, db, wiki, name in gen:
+        for types, q, db, wiki, name, score in gen:
+            if score < 0.3:
+                continue
             for t in types:
                 if t not in entities:
                     entities[t] = []
-                entities[t].append({'wikidata': q, 'name': name, 'dbpedia': db, 'wikipedia': wiki})
+                entities[t].append({'wikidata': q, 'name': name, 'dbpedia': db, 'wikipedia': wiki, 'score': score})
         return jsonify(entities)
     except Exception:
         traceback.print_exc()
