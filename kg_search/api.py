@@ -54,7 +54,7 @@ def search():
             for t in types:
                 if t not in entities:
                     entities[t] = []
-                entities[t].append({'entity': q, 'name': name, 'dbpedia': db, 'wikipedia': wiki})
+                entities[t].append({'wikidata': q, 'name': name, 'dbpedia': db, 'wikipedia': wiki})
         return jsonify(entities)
     except Exception:
         traceback.print_exc()
