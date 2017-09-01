@@ -21,16 +21,13 @@
 
 import traceback
 
-from flask import Flask, request
+from flask import request
 from flask.json import jsonify
-from flask_cache import Cache
 
 from kg_search.search import search_seeds_from_image, search_seeds
+from kg_search import app, cache
 
 __author__ = 'Fernando Serena'
-
-app = Flask(__name__)
-cache = Cache(app, config={'CACHE_TYPE': 'filesystem', 'CACHE_DIR': 'cache'})
 
 
 def make_cache_key(*args, **kwargs):
@@ -47,16 +44,17 @@ def search():
         q = request.args.get('q')
         img = request.args.get('img')
         types = request.args.getlist('types')
+        limit = request.args.get('limit', 200)
         entities = {}
         if img is not None:
             gen = search_seeds_from_image(img, types=types)
         else:
-            gen = search_seeds(q, types=types)
-        for types, q, name in gen:
+            gen = search_seeds(q, types=types, count=limit)
+        for types, q, db, wiki, name in gen:
             for t in types:
                 if t not in entities:
                     entities[t] = []
-                entities[t].append({'entity': q, 'name': name})
+                entities[t].append({'entity': q, 'name': name, 'dbpedia': db, 'wikipedia': wiki})
         return jsonify(entities)
     except Exception:
         traceback.print_exc()

@@ -20,3 +20,11 @@
 """
 
 __author__ = 'Fernando Serena'
+
+from flask import Flask
+from flask_cache import Cache
+
+app = Flask(__name__)
+cache = Cache(app, config={'CACHE_TYPE': 'filesystem', 'CACHE_DIR': 'api_cache'})
+kg_cache = Cache(app, config={'CACHE_TYPE': 'filesystem', 'CACHE_DIR': 'kg_cache'})
+wd_cache = Cache(app, config={'CACHE_TYPE': 'filesystem', 'CACHE_DIR': 'wd_cache'})
