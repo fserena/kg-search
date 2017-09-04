@@ -245,7 +245,7 @@ def search_entities(q, **kwargs):
 
 
 @kg_cache.memoize(3600)
-def search_seeds_from_image(img, types=None):
+def search_seeds_from_image(img, types=None, count=None):
     r = requests.post(
         'https://vision.googleapis.com/v1/images:annotate?key={}'.format(GOOGLE_API_KEY),
         data=json.dumps({
@@ -265,22 +265,25 @@ def search_seeds_from_image(img, types=None):
             ]
         }))
 
+    if count is None:
+        count = 1
+
     if r.status_code == 200:
         data = r.json()
         try:
             descriptions = map(lambda x: x['description'], data['responses'][0]['webDetection']['webEntities'])
             for d in descriptions:
-                for seed_tuple in search_seeds(d, types=types, count=1):
+                for seed_tuple in search_seeds(d, types=types, count=count):
                     yield seed_tuple
         except:
             pass
 
 
-def search_seeds(search, types=None, count=200):
+def search_seeds(search, types=None, **kwargs):
     if not types:
-        for res in search_entities(search, count=count):
+        for res in search_entities(search, **kwargs):
             yield res
     else:
         for type in types:
-            for res in search_entities(search, types=[type], count=count):
+            for res in search_entities(search, types=[type], **kwargs):
                 yield res

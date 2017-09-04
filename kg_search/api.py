@@ -44,30 +44,37 @@ def search():
         q = request.args.get('q')
         img = request.args.get('img')
         types = request.args.getlist('types')
-        limit = request.args.get('limit', 200)
+        limit = int(request.args.get('limit', 200))
         best = request.args.get('best', None)
         if best is not None:
             best = True
 
         entities = {}
         if img is not None:
-            gen = search_seeds_from_image(img, types=types)
+            gen = search_seeds_from_image(img, types=types, count=limit)
         else:
             gen = search_seeds(q, types=types, count=limit)
 
         best_score = 0
-        for types, q, db, wiki, name, score in gen:
+        n = 0
+        for types, q, db, wiki, name, score in sorted(list(gen), key=lambda x: x[5], reverse=True):
             if score < 0.1:
                 continue
             if best and score > best_score:
-                entities.clear()
+                entities = {}
                 best_score = score
             if best and score < best_score:
                 continue
             for t in types:
                 if t not in entities:
                     entities[t] = []
-                entities[t].append({'wikidata': q, 'name': name, 'dbpedia': db, 'wikipedia': wiki, 'score': score})
+                s_dict = {'wikidata': q, 'name': name, 'dbpedia': db, 'wikipedia': wiki, 'score': score}
+                if s_dict not in entities[t]:
+                    entities[t].append(s_dict)
+
+            n += 1
+            if n == limit:
+                break
         return jsonify(entities)
     except Exception:
         traceback.print_exc()
