@@ -45,13 +45,24 @@ def search():
         img = request.args.get('img')
         types = request.args.getlist('types')
         limit = request.args.get('limit', 200)
+        best = request.args.get('best', None)
+        if best is not None:
+            best = True
+
         entities = {}
         if img is not None:
             gen = search_seeds_from_image(img, types=types)
         else:
             gen = search_seeds(q, types=types, count=limit)
+
+        best_score = 0
         for types, q, db, wiki, name, score in gen:
-            if score < 0.3:
+            if score < 0.1:
+                continue
+            if best and score > best_score:
+                entities.clear()
+                best_score = score
+            if best and score < best_score:
                 continue
             for t in types:
                 if t not in entities:
