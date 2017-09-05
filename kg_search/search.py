@@ -51,7 +51,7 @@ def search_wiki_entity(wiki):
         for result in results["results"]["bindings"]:
             entity = result["item"]["value"].replace('http://www.wikidata.org/entity/', '')
             if entity:
-                print 'found {} for {}'.format(entity, wiki)
+                print u'found {} for {}'.format(entity, wiki)
             break
     except Exception:
         pass
@@ -214,7 +214,10 @@ def _kg_search(q, types=None, count=None, trace=None, source_q=None, ref_score=1
         types = res['types']
         name = res['name']
         score = res['score']
-        print wiki, name, score
+        try:
+            print u'{} {} {}'.format(wiki, name, score)
+        except:
+            pass
 
         if len(types) == 1 and 'Thing' in types:
             dbpedia = search_dbpedia_uri(wiki)
