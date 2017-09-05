@@ -44,7 +44,9 @@ def search():
         q = request.args.get('q')
         img = request.args.get('img')
         types = request.args.getlist('types')
-        limit = int(request.args.get('limit', 200))
+        limit = request.args.get('limit', None)
+        if limit is not None:
+            limit = int(limit)
         best = request.args.get('best', None)
         if best is not None:
             best = True

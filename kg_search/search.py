@@ -1,4 +1,5 @@
 import json
+import traceback
 import urlparse
 from urllib import quote, unquote
 import shelve
@@ -7,6 +8,7 @@ import requests
 import sys
 from SPARQLWrapper import JSON
 from SPARQLWrapper import SPARQLWrapper
+from StringIO import StringIO
 from rdflib import Graph, Namespace
 from concurrent.futures import ThreadPoolExecutor, wait
 
@@ -112,18 +114,19 @@ def iriToUri(iri):
     )
 
 
-def _kg_search(q, types=None, count=None, trace=None, source_q=None):
-    if trace is None:
-        trace = []
-
-    if source_q is None:
-        source_q = q
-
-    if (q, types) not in trace:
-        trace.append((q, types))
+def median(lst):
+    n = len(lst)
+    if n < 1:
+        return None
+    if n % 2 == 1:
+        return sorted(lst)[n // 2]
     else:
-        return {}
+        return sum(sorted(lst)[n // 2 - 1:n // 2 + 1]) / 2.0
 
+
+@kg_cache.memoize(3600)
+def _kg_request(q, types=None, count=None):
+    print u'querying "{}" with types {} [max {}] ...'.format(q, types, count)
     kg_request_url = u'https://kgsearch.googleapis.com/v1/entities:search?query={}&key={}&indent=True'.format(
         q, GOOGLE_API_KEY, count)
 
@@ -139,26 +142,46 @@ def _kg_search(q, types=None, count=None, trace=None, source_q=None):
     kg = Graph()
     kg.bind('schema', SCHEMA)
     ld_triples(kg_response.json(), kg)
+    # print kg.serialize(format='turtle')
+    return kg.serialize(format='turtle')
 
-    print kg.serialize(format='turtle')
 
+def _kg_search(q, types=None, count=None, trace=None, source_q=None, ref_score=1.0):
+    if trace is None:
+        trace = []
+
+    if source_q is None:
+        source_q = q
+
+    if (q, types) not in trace:
+        trace.append((q, types))
+    else:
+        return {}
+
+    kg = Graph()
+    kg.parse(StringIO(_kg_request(q, types=types, count=count)), format='turtle')
     kg_query_result = kg.query("""
-                    SELECT DISTINCT (MIN(?score) as ?min) (MAX(?score) as ?max) (AVG(?score) as ?avg) WHERE {
-                       [] <http://schema.googleapis.com/resultScore> ?score
-                    }
-                """)
+                        SELECT ?score WHERE {
+                           [] <http://schema.googleapis.com/resultScore> ?score
+                        }
+                    """)
+
+    scores = map(lambda x: x.score.toPython(), kg_query_result)
+    if not scores:
+        return {}
+
+    kgr_max_score = max(scores)
 
     try:
-        max_min_score = list(kg_query_result).pop()
-        max_score, min_score, avg_score = max_min_score.max.toPython(), \
-                                          max_min_score.min.toPython(), \
-                                          max_min_score.avg.toPython()
-
+        scores = map(lambda x: x / kgr_max_score, scores)
+        min_score = min(scores)
+        avg_score = sum(scores) / len(scores)
+        max_score = max(scores)
     except:
         max_score, min_score, avg_score = 0, 0, 0
 
-    score_th = avg_score * 0.1 + min_score * 0.9
-    deep_th = avg_score * 0.5 + max_score * 0.5
+    score_th = avg_score * 0.5 + max_score * 0.5
+    deep_th = avg_score * 0.1 + max_score * 0.9
     print max_score, min_score, avg_score, score_th, deep_th
 
     kg_query_result = kg.query("""
@@ -177,21 +200,21 @@ def _kg_search(q, types=None, count=None, trace=None, source_q=None):
     res_dict = {}
     types_score = {}
     for kgr in kg_query_result:
-        kgr_score = kgr.score.toPython()
+        kgr_score = kgr.score.toPython() / kgr_max_score
         if kgr_score >= score_th:
-            print kgr.score, kgr.wiki
             wiki_uri = iriToUri(kgr.wiki)
             wiki_uri = unquote(wiki_uri).decode('utf8')
             ty = kg.qname(kgr.type).split(':')[1]
 
             if wiki_uri not in res_dict:
-                res_dict[wiki_uri] = {'types': set(), 'name': kgr.name, 'score': kgr_score / max_score}
+                res_dict[wiki_uri] = {'types': set(), 'name': kgr.name.toPython(), 'score': kgr_score / max_score}
             res_dict[wiki_uri]['types'].add(ty)
 
     for wiki, res in res_dict.items():
         types = res['types']
         name = res['name']
         score = res['score']
+        print wiki, name, score
 
         if len(types) == 1 and 'Thing' in types:
             dbpedia = search_dbpedia_uri(wiki)
@@ -200,31 +223,27 @@ def _kg_search(q, types=None, count=None, trace=None, source_q=None):
             res_dict[wiki]['types'] = enrich_types
 
         for ty in res['types']:
-            if ty == 'Person':
-                pass
-
-            if ty != 'Thing' and score > 0.5 and similar(source_q, name) > 0.5:
+            if ty != 'Thing' and score > 0.5 / ref_score and similar(source_q, name) > 0.5 / ref_score:
                 if ty not in types_score:
                     types_score[ty] = set()
                 types_score[ty].add((score, name))
 
     for ty, pairs in types_score.items():
-        for score, name in pairs:
-            more = _kg_search(name, types=[ty], trace=trace, source_q=q, count=50)
-            for wiki in more:
-                if wiki not in res_dict:
-                    res_dict[wiki] = more[wiki]
+        try:
+            for score, name in pairs:
+                if (name, [ty]) not in trace:
+                    more = _kg_search(name, types=[ty], trace=trace, source_q=q, ref_score=score)
+                    for wiki in more:
+                        if wiki not in res_dict:
+                            res_dict[wiki] = more[wiki]
+        except Exception:
+            traceback.print_exc()
 
     return res_dict
 
 
-@kg_cache.memoize(3600)
-def kg_search(q, types=None, count=None):
-    return _kg_search(q, types=types, count=count)
-
-
 def search_entities(q, **kwargs):
-    kg_results = kg_search(q, **kwargs)
+    kg_results = _kg_search(q, **kwargs)
 
     results = []
     futures = []
@@ -265,8 +284,8 @@ def search_seeds_from_image(img, types=None, count=None):
             ]
         }))
 
-    if count is None:
-        count = 1
+    # if count is None:
+    #     count = 1
 
     if r.status_code == 200:
         data = r.json()
