@@ -180,7 +180,7 @@ def _kg_search(q, types=None, count=None, trace=None, source_q=None, ref_score=1
     except:
         max_score, min_score, avg_score = 0, 0, 0
 
-    score_th = avg_score * 0.5 + max_score * 0.5
+    score_th = avg_score    #  * 0.5 + max_score * 0.5
     deep_th = avg_score * 0.1 + max_score * 0.9
     print max_score, min_score, avg_score, score_th, deep_th
 
