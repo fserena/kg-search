@@ -26,5 +26,7 @@ from flask_cache import Cache
 
 app = Flask(__name__)
 cache = Cache(app, config={'CACHE_TYPE': 'filesystem', 'CACHE_DIR': 'api_cache'})
-kg_cache = Cache(app, config={'CACHE_TYPE': 'filesystem', 'CACHE_DIR': 'kg_cache'})
-wd_cache = Cache(app, config={'CACHE_TYPE': 'filesystem', 'CACHE_DIR': 'wd_cache'})
+kg_cache = Cache(app, config={'CACHE_TYPE': 'filesystem', 'CACHE_DIR': 'kg_cache', 'CACHE_THRESHOLD': 10000})
+wd_cache = Cache(app, config={'CACHE_TYPE': 'filesystem', 'CACHE_DIR': 'wd_cache', 'CACHE_THRESHOLD': 100000})
+wp_cache = Cache(app, config={'CACHE_TYPE': 'filesystem', 'CACHE_DIR': 'wp_cache', 'CACHE_THRESHOLD': 1000})
+dn_cache = Cache(app, config={'CACHE_TYPE': 'filesystem', 'CACHE_DIR': 'dn_cache', 'CACHE_THRESHOLD': 10000})
