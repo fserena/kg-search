@@ -40,7 +40,7 @@ setup(
     download_url="https://github.com/fserena/kg-search/tarball/{}".format(metadata['version']),
     packages=find_packages(exclude=['ez_setup', 'examples', 'tests']),
     install_requires=['Flask', 'Flask-Cache', 'gunicorn', 'futures', 'requests', 'urllib3', 'rdflib==4.2.0',
-                      'python-dateutil', 'pyld', 'rdflib-jsonld', 'shortuuid'],
+                      'python-dateutil', 'pyld', 'rdflib-jsonld', 'shortuuid', 'wikipedia==1.4.0'],
     classifiers=[],
     package_dir={'kg_search': 'kg_search'},
     package_data={'kg_search': ['metadata.json']},

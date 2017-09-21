@@ -10,3 +10,4 @@ pyld
 rdflib-jsonld
 jsonpath-rw
 shortuuid
+wikipedia==1.4.0
