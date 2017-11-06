@@ -1,3 +1,4 @@
+import base64
 import json
 import traceback
 import urllib
@@ -10,7 +11,7 @@ import sys
 from SPARQLWrapper import JSON
 from SPARQLWrapper import SPARQLWrapper
 from StringIO import StringIO
-from rdflib import Graph, Namespace
+from rdflib import Graph, Namespace, URIRef
 from concurrent.futures import ThreadPoolExecutor, wait
 
 from kg_search.ld import ld_triples
@@ -82,7 +83,6 @@ def search_dbpedia_uri(wiki):
 
 @dn_cache.memoize(864000)
 def recognize_entities(q=None, url=None):
-
     request_url = u'https://api.dandelion.eu/datatxt/nex/v1?token={}&'.format(DANDELION_API_KEY)
     results = {}
     if url is not None:
@@ -372,17 +372,25 @@ def search_types(search):
 
 
 @kg_cache.memoize(86400)
-def search_seeds_from_image(img, types=None, count=None):
+def search_seeds_from_image(img, types=None, count=None, raw=False):
+
+    if isinstance(img, URIRef):
+        image = {
+            "source": {
+                "imageUri": img
+            }
+        }
+    else:
+        image = {
+            "content": base64.b64encode(img.read())
+        }
+
     r = requests.post(
         'https://vision.googleapis.com/v1/images:annotate?key={}'.format(GOOGLE_API_KEY),
         data=json.dumps({
             "requests": [
                 {
-                    "image": {
-                        "source": {
-                            "imageUri": img
-                        }
-                    },
+                    "image": image,
                     "features": [
                         {
                             "type": "WEB_DETECTION"
@@ -397,18 +405,28 @@ def search_seeds_from_image(img, types=None, count=None):
         if types is None:
             types = []
         try:
-            descriptions = map(lambda x: x.get('description', None),
-                               data['responses'][0]['webDetection']['webEntities'])
-            desc_types = {}
-            for desc in filter(lambda x: x, descriptions):
-                for q, types in search_types(desc.lower()).items():
-                    if q not in desc_types:
-                        desc_types[q] = types
-                    else:
-                        desc_types[q] = list(set(desc_types[q]).union(types))
-            for d, found_types in desc_types.items():
-                for seed_tuple in search_seeds(d, types=list(set(types).union(found_types)), count=count):
-                    yield seed_tuple
+            entities = data['responses'][0]['webDetection']['webEntities']
+            mean_score = sum(map(lambda x: x.get('score'), entities)) / len(entities)
+
+            descriptions = [x.get('description', None) for x in entities if x.get('score') >= mean_score]
+            descriptions = filter(lambda x: x is not None, descriptions)
+
+            if raw:
+                for d in descriptions:
+                    yield d
+            else:
+                desc_types = {}
+                for desc in filter(lambda x: x, descriptions):
+                    for q, d_types in search_types(desc.lower()).items():
+                        if q not in desc_types:
+                            r_types = set.intersection(d_types, types) if types else d_types
+                            desc_types[q] = list(r_types)
+                        else:
+                            r_types = set(desc_types[q]).intersection(d_types) if types else set(desc_types[q]).union(d_types)
+                            desc_types[q] = list(r_types)
+                for d, found_types in desc_types.items():
+                    for seed_tuple in search_seeds(d, types=list(set(types).union(found_types)), count=count):
+                        yield seed_tuple
         except:
             pass
 

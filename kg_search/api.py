@@ -21,13 +21,16 @@
 
 import traceback
 
-from flask import request
+from flask import request, redirect
 from flask.json import jsonify
+from werkzeug.utils import secure_filename
 
-from kg_search.search import search_seeds_from_image, search_seeds_from_text, search_seeds_from_url
 from kg_search import app, cache
+from kg_search.search import search_seeds_from_image, search_seeds_from_text, search_seeds_from_url
 
 __author__ = 'Fernando Serena'
+
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 
 
 def make_cache_key(*args, **kwargs):
@@ -41,13 +44,41 @@ def are_equal(a, b):
     return a.split('/')[-1] == b.split('/')[-1]
 
 
-@app.route('/search')
-@cache.cached(timeout=3600, key_prefix=make_cache_key)
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+@app.route('/search', methods=['GET', 'POST'])
+@cache.cached(timeout=3600, key_prefix=make_cache_key, unless=lambda: request.method == 'POST')
 def search():
-    try:
-        q = request.args.get('q')
+    img = None
+    raw = False
+    if request.method == 'POST':
+        if 'file' not in request.files:
+            return redirect(request.url)
+        file = request.files['file']
+        # if user does not select file, browser also
+        # submit an empty part without filename
+        if file.filename == '':
+            return redirect(request.url)
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            # file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+            # return redirect(url_for('uploaded_file',
+            #                         filename=filename))
+            img = file
+
+    if img is None:
         img = request.args.get('img')
+        q = request.args.get('q')
         url = request.args.get('url')
+
+    raw = request.args.get('raw', None)
+    if raw is not None:
+        raw = True
+
+    try:
         types = request.args.getlist('types')
         limit = request.args.get('limit', None)
         if limit is not None:
@@ -58,7 +89,9 @@ def search():
 
         entities = {}
         if img is not None:
-            gen = search_seeds_from_image(img, types=types, count=limit)
+            gen = search_seeds_from_image(img, types=types, count=limit, raw=raw)
+            if raw:
+                return jsonify(list(gen))
         elif url is not None:
             gen = search_seeds_from_url(url, types=types, count=limit)
         else:
@@ -80,7 +113,7 @@ def search():
                 s_dict = {'wikidata': q, 'name': name, 'dbpedia': db, 'wikipedia': wiki, 'score': score}
                 if not any(filter(
                         lambda x: are_equal(x['wikipedia'], s_dict['wikipedia']) or (
-                                x['wikidata'] is not None and x['wikidata'] == s_dict['wikidata']),
+                                        x['wikidata'] is not None and x['wikidata'] == s_dict['wikidata']),
                         entities[t])):
                     entities[t].append(s_dict)
 
