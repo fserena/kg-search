@@ -25,6 +25,8 @@ from flask import request, redirect
 from flask.json import jsonify
 from werkzeug.utils import secure_filename
 
+from rdflib import URIRef
+
 from kg_search import app, cache
 from kg_search.search import search_seeds_from_image, search_seeds_from_text, search_seeds_from_url
 
@@ -71,8 +73,13 @@ def search():
 
     if img is None:
         img = request.args.get('img')
+        if img:
+            img = URIRef(img)
         q = request.args.get('q')
         url = request.args.get('url')
+        if url:
+            url = URIRef(url)
+
 
     raw = request.args.get('raw', None)
     if raw is not None:

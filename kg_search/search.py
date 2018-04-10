@@ -190,7 +190,7 @@ def median(lst):
 def _kg_request(q, types=None, count=None):
     print u'querying "{}" with types {} [max {}] ...'.format(q, types, count)
     kg_request_url = u'https://kgsearch.googleapis.com/v1/entities:search?query={}&key={}&indent=True'.format(
-        q, GOOGLE_API_KEY, count)
+        q, GOOGLE_API_KEY)
 
     if count is not None:
         kg_request_url += '&limit={}'.format(count)
@@ -377,7 +377,7 @@ def search_seeds_from_image(img, types=None, count=None, raw=False):
     if isinstance(img, URIRef):
         image = {
             "source": {
-                "imageUri": img
+                "imageUri": str(img)
             }
         }
     else:
@@ -385,6 +385,7 @@ def search_seeds_from_image(img, types=None, count=None, raw=False):
             "content": base64.b64encode(img.read())
         }
 
+    print GOOGLE_API_KEY
     r = requests.post(
         'https://vision.googleapis.com/v1/images:annotate?key={}'.format(GOOGLE_API_KEY),
         data=json.dumps({
@@ -400,6 +401,7 @@ def search_seeds_from_image(img, types=None, count=None, raw=False):
             ]
         }))
 
+    print r.status_code
     if r.status_code == 200:
         data = r.json()
         if types is None:
